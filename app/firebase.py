@@ -10,6 +10,7 @@ from firebase_admin import credentials, firestore, storage
 
 
 _DEFAULT_SECRET_FILES = (
+    "/etc/secrets/firebase-service.json",
     "/etc/secrets/firebase-service-account.json",
     "/etc/secrets/firebase_service_account.json",
     "/etc/secrets/firebase.json",
@@ -53,11 +54,19 @@ def _initialize() -> None:
     if _app is not None:
         return
 
+    # Reuse an already-created Admin SDK app when the process initialized one
+    # elsewhere. This keeps the shared Firebase app singleton-safe.
+    try:
+        _app = firebase_admin.get_app()
+        return
+    except ValueError:
+        pass
+
     source = _service_account_source()
     if source is None:
         raise RuntimeError(
-            "Firebase service account not configured. Add the JSON as a Render Secret File "
-            "and set FIREBASE_SERVICE_ACCOUNT_FILE to /etc/secrets/<filename> if it is not one of the default names."
+            "Firebase service account not configured. Add firebase-service.json as a Render Secret File "
+            "or set FIREBASE_SERVICE_ACCOUNT_FILE to /etc/secrets/<filename>."
         )
 
     cred = credentials.Certificate(source)
@@ -67,6 +76,12 @@ def _initialize() -> None:
     if bucket_name:
         options["storageBucket"] = bucket_name
     _app = firebase_admin.initialize_app(cred, options)
+
+
+def firebase_app():
+    """Return the shared Firebase Admin SDK application."""
+    _initialize()
+    return _app
 
 
 def db():
