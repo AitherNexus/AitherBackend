@@ -3,13 +3,13 @@ from __future__ import annotations
 import secrets
 import uuid
 
-import firebase_admin
 from fastapi import APIRouter, HTTPException, Response
 from firebase_admin import auth as firebase_auth
 from pydantic import BaseModel, Field
 
 from app.api.auth import create_session, hash_password, set_session_cookie, user_payload
 from app.db import connection
+from app.firebase import firebase_app
 
 router = APIRouter(prefix="/api/auth", tags=["firebase-auth"])
 
@@ -18,20 +18,18 @@ class FirebaseTokenRequest(BaseModel):
     id_token: str = Field(min_length=20, max_length=10000)
 
 
-def _firebase_app() -> firebase_admin.App:
-    try:
-        return firebase_admin.get_app()
-    except ValueError:
-        return firebase_admin.initialize_app()
-
-
 @router.post("/firebase")
 async def exchange_firebase_token(payload: FirebaseTokenRequest, response: Response) -> dict[str, object]:
+    """Exchange a Firebase ID token for the shared Aither session.
+
+    Firebase Admin is initialized from the Render Secret File
+    `firebase-service.json`; the credential is never returned to the client.
+    """
     try:
-        _firebase_app()
-        decoded = firebase_auth.verify_id_token(payload.id_token)
+        firebase_app()
+        decoded = firebase_auth.verify_id_token(payload.id_token, check_revoked=True)
     except Exception as exc:
-        raise HTTPException(status_code=401, detail="Invalid or expired Firebase ID token.") from exc
+        raise HTTPException(status_code=401, detail="Invalid, expired, or revoked Firebase ID token.") from exc
 
     email = str(decoded.get("email") or "").strip().lower()
     if not email:
