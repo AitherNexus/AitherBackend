@@ -12,9 +12,11 @@ def _sqlite_path() -> str:
     if not DATABASE_URL.startswith("sqlite:///"):
         raise RuntimeError("This foundation currently requires a sqlite DATABASE_URL, e.g. sqlite:///./aither.db")
     path = DATABASE_URL.removeprefix("sqlite:///")
-    if path == ":memory:": return path
+    if path == ":memory:":
+        return path
     p = Path(path)
-    if not p.is_absolute(): p = Path.cwd() / p
+    if not p.is_absolute():
+        p = Path.cwd() / p
     p.parent.mkdir(parents=True, exist_ok=True)
     return str(p)
 
@@ -26,7 +28,8 @@ def connection() -> Iterator[sqlite3.Connection]:
     try:
         yield conn
         conn.commit()
-    finally: conn.close()
+    finally:
+        conn.close()
 
 def init_db() -> None:
     with connection() as conn:
@@ -47,4 +50,6 @@ def init_db() -> None:
         CREATE INDEX IF NOT EXISTS idx_telemetry_app_id ON telemetry_events(app_id);
         CREATE TABLE IF NOT EXISTS mail_messages (id INTEGER PRIMARY KEY AUTOINCREMENT,owner_user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,sender TEXT NOT NULL,recipients TEXT NOT NULL DEFAULT '',cc TEXT NOT NULL DEFAULT '',subject TEXT NOT NULL DEFAULT '',body TEXT NOT NULL DEFAULT '',created_at TEXT NOT NULL,is_read INTEGER NOT NULL DEFAULT 0,deleted INTEGER NOT NULL DEFAULT 0,folder TEXT NOT NULL DEFAULT 'inbox');
         CREATE INDEX IF NOT EXISTS idx_mail_owner ON mail_messages(owner_user_id,deleted,id DESC);
+        CREATE TABLE IF NOT EXISTS passkeys (credential_id TEXT PRIMARY KEY,user_id TEXT NOT NULL,public_key TEXT NOT NULL,sign_count INTEGER NOT NULL DEFAULT 0,created_at TEXT NOT NULL);
+        CREATE INDEX IF NOT EXISTS idx_passkeys_user_id ON passkeys(user_id);
         """)
