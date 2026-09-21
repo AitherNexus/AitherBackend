@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     app_name: str = "AitherBackend"
     app_version: str = "2.7.1"
     environment: str = "development"
-    cors_origins: str = "http://localhost:3000,http://localhost:5173,https://aitherforge.github.io"
+    cors_origins: str = "http://localhost:3000,http://localhost:5173,https://aitherforge.github.io,https://aithernexus.gitlab.io"
     database_url: str = "sqlite:///./aither.db"
     session_ttl_hours: int = 720
     secure_cookies: bool = True
@@ -55,7 +55,7 @@ class Settings(BaseSettings):
     @property
     def cors_origin_list(self) -> list[str]:
         origins = [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
-        required_origins = {"https://aitherforge.github.io", "http://localhost:3000", "http://localhost:5173"}
+        required_origins = {"https://aitherforge.github.io", "https://aithernexus.gitlab.io", "http://localhost:3000", "http://localhost:5173"}
         for origin in required_origins:
             if origin not in origins:
                 origins.append(origin)
@@ -76,7 +76,6 @@ class Settings(BaseSettings):
 
 
 def _load_gemini_secret_file() -> str:
-    """Load the Gemini key from Render's mounted Secret File without logging it."""
     try:
         return GEMINI_SECRET_FILE.read_text(encoding="utf-8").strip()
     except (FileNotFoundError, OSError):
@@ -84,7 +83,6 @@ def _load_gemini_secret_file() -> str:
 
 
 def _load_resend_secret_file() -> str:
-    """Load the Resend key from Render Secret Files without logging it."""
     for path in RESEND_SECRET_FILES:
         try:
             value = path.read_text(encoding="utf-8").strip()
@@ -96,7 +94,6 @@ def _load_resend_secret_file() -> str:
 
 
 def _load_serpstack_secret_file() -> str:
-    """Load the Serpstack key from a Render Secret File without logging it."""
     for path in SERPSTACK_SECRET_FILES:
         try:
             value = path.read_text(encoding="utf-8").strip()
@@ -118,9 +115,6 @@ if not settings.serpstack_api_key:
     if serpstack_secret:
         settings.serpstack_api_key = serpstack_secret
 
-# The auth module historically reads RESEND_API_KEY from the environment.
-# Bridge Render's mounted Secret File into that runtime environment without
-# ever committing the credential to GitHub or exposing it to the frontend.
 if not os.getenv("RESEND_API_KEY", "").strip():
     resend_secret = _load_resend_secret_file()
     if resend_secret:
