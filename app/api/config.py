@@ -363,7 +363,8 @@ async def passkey_auth_options() -> dict[str, object]:
     _cleanup()
     options = generate_authentication_options(
         rp_id=PASSKEY_RP_ID,
-        user_verification=UserVerificationRequirement.REQUIRED,
+        user_verification=UserVerificationRequirement.PREFERRED,
+        allow_credentials=[],
     )
     challenge_id = secrets.token_urlsafe(24)
     _passkey_challenges[challenge_id] = (time.time() + 300, options.challenge, None)
