@@ -34,6 +34,9 @@ class Settings(BaseSettings):
     smtp_password: str = ""
     smtp_from_email: str = "onboarding@resend.dev"
     smtp_from_name: str = "Aither"
+    resend_from_email: str = "onboarding@resend.dev"
+    resend_from_name: str = "Aither"
+    aithersignin_url: str = "https://aithernexus.gitlab.io/aithersignin"
     verification_token_hours: int = 24
     google_client_id: str = "430217545519-mcir19njrosrpd5hstamro55qq6f716b.apps.googleusercontent.com"
     openrouter_api_key: str = ""
