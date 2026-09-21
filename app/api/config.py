@@ -4,6 +4,7 @@ import json
 import os
 import secrets
 import time
+import httpx
 from datetime import datetime, timezone
 from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
@@ -36,6 +37,8 @@ _DEVICE_CODE_TTL_SECONDS = 120
 _handoffs: dict[str, tuple[float, dict[str, object]]] = {}
 _device_codes: dict[str, tuple[float, str]] = {}
 _passkey_challenges: dict[str, tuple[float, bytes, str | None]] = {}
+_magic_links: dict[str, tuple[float, str]] = {}
+_MAGIC_LINK_TTL_SECONDS = 600
 
 PASSKEY_RP_ID = os.getenv("PASSKEY_RP_ID", "aithernexus.gitlab.io").strip()
 PASSKEY_ORIGIN = os.getenv("PASSKEY_ORIGIN", "https://aithernexus.gitlab.io").strip()
@@ -134,6 +137,72 @@ async def exchange_aithersignin_code(payload: AitherSignInTokenRequest) -> dict[
     if account["client_id"] != payload.client_id:
         raise HTTPException(status_code=400, detail="AitherSignIn client mismatch.")
     return {"authenticated": True, "user": {"id": account["id"], "username": account["username"], "email": account["email"], "photoURL": account["photoURL"]}}
+
+
+class MagicLinkRequest(BaseModel):
+    email: str = Field(min_length=3, max_length=320)
+
+
+@router.post("/aithersignin/magic-link")
+async def send_magic_link(payload: MagicLinkRequest) -> dict[str, object]:
+    email = payload.email.strip().lower()
+    try:
+        firebase_app()
+        user = firebase_auth.get_user_by_email(email)
+    except Exception:
+        # Avoid revealing whether an account exists.
+        return {"sent": True}
+
+    _cleanup()
+    code = secrets.token_urlsafe(32)
+    _magic_links[code] = (time.time() + _MAGIC_LINK_TTL_SECONDS, user.uid)
+    link = f"{settings.aithersignin_url.rstrip('/')}/?magic_code={code}"
+
+    api_key = os.getenv("RESEND_API_KEY", "").strip()
+    if not api_key:
+        raise HTTPException(status_code=503, detail="Resend is not configured on AitherBackend.")
+
+    from_email = f"{settings.resend_from_name} <{settings.resend_from_email}>"
+    html = f"""<div style="font-family:-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;max-width:560px;margin:auto;padding:32px">
+<h1>Sign in to Aither</h1>
+<p>Use the button below to securely sign in. This link expires in 10 minutes.</p>
+<p><a href="{link}" style="display:inline-block;background:#625cff;color:#fff;text-decoration:none;padding:13px 20px;border-radius:10px;font-weight:700">Sign in to Aither</a></p>
+<p style="color:#777">If you did not request this, you can ignore this email.</p>
+</div>"""
+    text_body = f"Sign in to Aither: {link}\n\nThis link expires in 10 minutes."
+
+    try:
+        async with httpx.AsyncClient(timeout=15) as client:
+            response = await client.post(
+                "https://api.resend.com/emails",
+                headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+                json={"from": from_email, "to": [email], "subject": "Your Aither sign-in link", "html": html, "text": text_body},
+            )
+        if response.status_code >= 400:
+            raise HTTPException(status_code=502, detail="Resend could not send the sign-in email.")
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail="Could not reach Resend.") from exc
+
+    return {"sent": True}
+
+
+@router.post("/aithersignin/magic-link/redeem")
+async def redeem_magic_link(payload: DeviceCodeRedeemRequest) -> dict[str, object]:
+    _cleanup()
+    entry = _magic_links.pop(payload.code.strip(), None)
+    if not entry:
+        raise HTTPException(status_code=400, detail="Invalid or expired magic link.")
+    _, uid = entry
+    firebase_app()
+    user = firebase_auth.get_user(uid)
+    custom_token = firebase_auth.create_custom_token(uid)
+    return {
+        "authenticated": True,
+        "custom_token": custom_token.decode("utf-8") if isinstance(custom_token, bytes) else custom_token,
+        "user": {"id": uid, "username": user.display_name or user.email or "Aither User", "email": user.email or "", "photoURL": user.photo_url or ""},
+    }
 
 
 class DeviceCodeRequest(BaseModel):
