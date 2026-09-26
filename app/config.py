@@ -15,6 +15,11 @@ SERPSTACK_SECRET_FILES = (
     Path("/etc/secrets/serpstack_api_key"),
     Path("/etc/secrets/serpstack-api-key"),
 )
+GOOGLE_SEARCH_SECRET_FILES = (
+    Path("/etc/secrets/GOOGLE_SEARCH_API_KEY"),
+    Path("/etc/secrets/google_search_api_key"),
+    Path("/etc/secrets/google-search-api-key"),
+)
 
 
 class Settings(BaseSettings):
@@ -52,6 +57,9 @@ class Settings(BaseSettings):
     serpstack_api_key: str = ""
     serpstack_url: str = "https://api.serpstack.com/search"
     serpstack_timeout_seconds: float = 30.0
+    google_search_api_key: str = ""
+    google_search_engine_id: str = ""
+    google_search_timeout_seconds: float = 30.0
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
@@ -107,6 +115,17 @@ def _load_serpstack_secret_file() -> str:
     return ""
 
 
+def _load_google_search_secret_file() -> str:
+    for path in GOOGLE_SEARCH_SECRET_FILES:
+        try:
+            value = path.read_text(encoding="utf-8").strip()
+        except (FileNotFoundError, OSError):
+            continue
+        if value:
+            return value
+    return ""
+
+
 settings = Settings()
 if not settings.gemini_api_key:
     secret_from_file = _load_gemini_secret_file()
@@ -117,6 +136,11 @@ if not settings.serpstack_api_key:
     serpstack_secret = _load_serpstack_secret_file()
     if serpstack_secret:
         settings.serpstack_api_key = serpstack_secret
+
+if not settings.google_search_api_key:
+    google_search_secret = _load_google_search_secret_file()
+    if google_search_secret:
+        settings.google_search_api_key = google_search_secret
 
 if not os.getenv("RESEND_API_KEY", "").strip():
     resend_secret = _load_resend_secret_file()
