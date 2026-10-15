@@ -26,7 +26,7 @@ class Settings(BaseSettings):
     app_name: str = "AitherBackend"
     app_version: str = "2.7.1"
     environment: str = "development"
-    cors_origins: str = "http://localhost:3000,http://localhost:5173,https://aitherforge.github.io,https://aithernexus.gitlab.io,https://gardening.djthebest53.workers.dev"
+    cors_origins: str = "http://localhost:3000,http://localhost:5173,https://aitherforge.github.io,https://aithernexus.gitlab.io,https://gardening.djthebest53.workers.dev,https://gardening.wasmer.app"
     database_url: str = "sqlite:///./aither.db"
     session_ttl_hours: int = 720
     secure_cookies: bool = True
@@ -66,7 +66,14 @@ class Settings(BaseSettings):
     @property
     def cors_origin_list(self) -> list[str]:
         origins = [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
-        required_origins = {"https://aitherforge.github.io", "https://aithernexus.gitlab.io", "https://gardening.djthebest53.workers.dev", "http://localhost:3000", "http://localhost:5173"}
+        required_origins = {
+            "https://aitherforge.github.io",
+            "https://aithernexus.gitlab.io",
+            "https://gardening.djthebest53.workers.dev",
+            "https://gardening.wasmer.app",
+            "http://localhost:3000",
+            "http://localhost:5173",
+        }
         for origin in required_origins:
             if origin not in origins:
                 origins.append(origin)
